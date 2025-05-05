@@ -2,42 +2,52 @@ import streamlit as st
 import numpy as np
 import joblib
 
-# Load model
-model = joblib.load('model.pkl')
+# Load the trained model
+model = joblib.load("model.pkl")
 
-# Preprocessing function
-def preprocess_input(int_features):
-    # One-hot for feature[0]
-    if int_features[0] == 0:
-        f_features = [0, 0, 0] + int_features[1:]
-    elif int_features[0] == 1:
-        f_features = [1, 0, 0] + int_features[1:]
-    elif int_features[0] == 2:
-        f_features = [0, 1, 0] + int_features[1:]
-    else:
-        f_features = [0, 0, 1] + int_features[1:]
+# One-hot encoding preprocessing
+def preprocess_input(inputs):
+    protocol = int(inputs[0])
+    service = int(inputs[7])
 
-    # One-hot for feature[6] (was originally feature index 6, now at 9 after first one-hot)
-    if f_features[6] == 0:
-        fn_features = f_features[:6] + [0, 0] + f_features[7:]
-    elif f_features[6] == 1:
-        fn_features = f_features[:6] + [1, 0] + f_features[7:]
-    else:
-        fn_features = f_features[:6] + [0, 1] + f_features[7:]
+    # One-hot encode protocol type (3 values)
+    proto_encoded = [0, 0, 0]
+    if protocol in [0, 1, 2]:
+        proto_encoded[protocol] = 1
 
-    return np.array(fn_features)
+    # One-hot encode service type (3 values assumed)
+    service_encoded = [0, 0]
+    if service == 1:
+        service_encoded = [1, 0]
+    elif service == 2:
+        service_encoded = [0, 1]
 
-# UI
+    # Build final input array
+    # Drop protocol and service from original input
+    numerical = inputs[1:7] + inputs[8:]
+    final_input = proto_encoded + numerical[:6] + service_encoded + numerical[6:]
+    return np.array(final_input)
+
+# Streamlit UI
 st.title("Intrusion Detection System")
 
-# Collect inputs
-protocol = st.selectbox("Protocol Type", [0, 1, 2], format_func=lambda x: ['tcp', 'udp', 'icmp'][x])
-features = [protocol]
-for i in range(1, 10):
-    features.append(st.number_input(f"Feature {i}", step=0.01))
+protocol_map = {"tcp": 0, "udp": 1, "icmp": 2}
+protocol = st.selectbox("Protocol Type", list(protocol_map.keys()))
+f1 = st.number_input("Feature 1")
+f2 = st.number_input("Feature 2")
+f3 = st.number_input("Feature 3")
+f4 = st.number_input("Feature 4")
+f5 = st.number_input("Feature 5")
+f6 = st.number_input("Feature 6")
+service = st.selectbox("Service Type (Feature 7)", [0, 1, 2])
+f8 = st.number_input("Feature 8")
+f9 = st.number_input("Feature 9")
 
 if st.button("Predict"):
-    input_array = preprocess_input(features)
-    prediction = model.predict([input_array])[0]
-    labels = ['Normal', 'DOS', 'PROBE', 'R2L', 'U2R']
-    st.success(f"Prediction: {labels[prediction]}")
+    input_list = [
+        protocol_map[protocol], f1, f2, f3, f4, f5, f6, service, f8, f9
+    ]
+    final_input = preprocess_input(input_list)
+    prediction = model.predict([final_input])[0]
+    classes = ["Normal", "DOS", "PROBE", "R2L", "U2R"]
+    st.success(f"Prediction: {classes[prediction]}")
